@@ -38,6 +38,21 @@ const CalendarView = () => {
     }
   };
 
+  // Helper function to parse date as local date (not UTC)
+  const parseLocalDate = (dateString) => {
+    if (!dateString) return null;
+    const [year, month, day] = dateString.split('T')[0].split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  };
+
+  // Helper function to format date as YYYY-MM-DD in local timezone
+  const formatLocalDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const generateMonthCalendar = (year, month, assignments) => {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
@@ -55,13 +70,17 @@ const CalendarView = () => {
         
         const isCurrentMonth = currentDate.getMonth() === month;
         const isToday = currentDate.toDateString() === today.toDateString();
-        const dateString = currentDate.toISOString().split('T')[0];
+        const dateString = formatLocalDate(currentDate);
         
         // Calculate cognitive load for this day
         const loadScore = loadCalculator.calculateDayLoad(assignments, [], currentDate);
         
-        // Get assignments due on this day
-        const dayAssignments = assignments.filter(a => a.dueDate === dateString);
+        // Get assignments due on this day - compare using local dates
+        const dayAssignments = assignments.filter(a => {
+          if (!a.deadline_date) return false;
+          const assignmentDate = parseLocalDate(a.deadline_date);
+          return assignmentDate && formatLocalDate(assignmentDate) === dateString;
+        });
         
         weekDays.push({
           date: currentDate,
@@ -235,7 +254,7 @@ const CalendarView = () => {
                     <div className="flex-1 flex flex-col justify-end">
                       {day.assignments.slice(0, 2).map((assignment, index) => (
                         <div
-                          key={assignment.id}
+                          key={assignment._id}
                           className="text-xs bg-black bg-opacity-20 rounded px-1 mb-1 truncate"
                           title={assignment.title}
                         >
@@ -318,26 +337,19 @@ const CalendarView = () => {
               {selectedDay.assignments.length > 0 ? (
                 <div className="space-y-2">
                   {selectedDay.assignments.map((assignment) => (
-                    <div key={assignment.id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div key={assignment._id} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h5 className="font-medium text-gray-900 dark:text-white">
                             {assignment.title}
                           </h5>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {assignment.courseId} • {assignment.type}
+                            {assignment.course_id?.name || 'Unknown Course'} • {assignment.type}
                           </p>
                           <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                            <span>Difficulty: {'●'.repeat(assignment.difficulty)}{'○'.repeat(5-assignment.difficulty)}</span>
-                            <span>Est. {assignment.estimatedHours}h</span>
-                            <span>Weight: {assignment.importance}/10</span>
+                            <span>Difficulty: {'●'.repeat(assignment.difficulty || 3)}{'○'.repeat(5-(assignment.difficulty || 3))}</span>
                           </div>
                         </div>
-                        {assignment.status === 'completed' && (
-                          <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                            ✓ Done
-                          </span>
-                        )}
                       </div>
                     </div>
                   ))}

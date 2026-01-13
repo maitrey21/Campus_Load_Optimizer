@@ -41,45 +41,56 @@ const NotificationsView = () => {
     const assignments = data.assignments || [];
     const now = new Date();
 
+    // Helper to parse dates correctly
+    const parseLocalDate = (dateString) => {
+      if (!dateString) return null;
+      const datePart = dateString.split('T')[0];
+      const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+      return new Date(year, month - 1, day);
+    };
+
     // Generate deadline reminders
     assignments.forEach(assignment => {
-      if (assignment.status === 'completed') return;
+      const dueDate = parseLocalDate(assignment.deadline_date);
+      if (!dueDate) return;
       
-      const dueDate = new Date(assignment.dueDate);
-      const daysUntil = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+      dueDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
       
       if (daysUntil === 1) {
         generated.push({
-          id: `deadline-${assignment.id}`,
+          id: `deadline-${assignment._id}`,
           type: 'warning',
           title: 'Assignment Due Tomorrow',
-          message: `${assignment.title} (${assignment.courseId}) is due tomorrow. Make sure you're ready!`,
+          message: `${assignment.title} (${assignment.course_id?.name || 'Unknown Course'}) is due tomorrow. Make sure you're ready!`,
           timestamp: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
           read: false,
           category: 'deadline',
-          assignmentId: assignment.id
+          assignmentId: assignment._id
         });
       } else if (daysUntil === 3) {
         generated.push({
-          id: `reminder-${assignment.id}`,
+          id: `reminder-${assignment._id}`,
           type: 'info',
           title: '3-Day Deadline Reminder',
-          message: `${assignment.title} (${assignment.courseId}) is due in 3 days. Time to finalize your work!`,
+          message: `${assignment.title} (${assignment.course_id?.name || 'Unknown Course'}) is due in 3 days. Time to finalize your work!`,
           timestamp: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
           read: Math.random() > 0.5,
           category: 'deadline',
-          assignmentId: assignment.id
+          assignmentId: assignment._id
         });
       } else if (daysUntil <= 0 && daysUntil > -7) {
         generated.push({
-          id: `overdue-${assignment.id}`,
+          id: `overdue-${assignment._id}`,
           type: 'error',
           title: 'Assignment Overdue',
-          message: `${assignment.title} (${assignment.courseId}) was due ${Math.abs(daysUntil)} day(s) ago. Contact your professor if needed.`,
+          message: `${assignment.title} (${assignment.course_id?.name || 'Unknown Course'}) was due ${Math.abs(daysUntil)} day(s) ago. Contact your professor if needed.`,
           timestamp: new Date(dueDate.getTime() + 24 * 60 * 60 * 1000).toISOString(),
           read: false,
           category: 'overdue',
-          assignmentId: assignment.id
+          assignmentId: assignment._id
         });
       }
     });

@@ -1,145 +1,207 @@
-import axios from 'axios';
+import api from '../apis/api';
 import { mockData, generateCalendarData } from './mockData';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests if available
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Check if user is using demo account
+/* =========================
+   Helpers
+========================= */
 const isDemoUser = () => {
   const token = localStorage.getItem('token');
   return token && token.startsWith('demo_token_');
 };
 
-// Get demo user data
 const getDemoUser = () => {
   const demoUser = localStorage.getItem('demo_user');
   return demoUser ? JSON.parse(demoUser) : null;
 };
 
+const getCurrentUserId = () => {
+  const user = localStorage.getItem('user');
+  if (!user) return null;
+  const parsed = JSON.parse(user);
+  return parsed.id || parsed._id;
+};
+/* =========================
+   Student Service
+========================= */
+
 export const studentService = {
+  /* -------------------------
+     DASHBOARD
+  ------------------------- */
   async getDashboardData() {
+    /* ===== DEMO MODE ===== */
     if (isDemoUser()) {
       const user = getDemoUser();
-      if (user && user.mockData) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Filter assignments for upcoming deadlines (next 14 days)
-        const now = new Date();
-        const twoWeeksFromNow = new Date(now.getTime() + (14 * 24 * 60 * 60 * 1000));
-        
-        const upcomingDeadlines = user.mockData.assignments.filter(assignment => {
-          const dueDate = new Date(assignment.dueDate);
-          return dueDate >= now && dueDate <= twoWeeksFromNow && assignment.status !== 'completed';
-        });
+      if (!user?.mockData) return null;
 
-        // Filter assignments for today
-        const today = now.toISOString().split('T')[0];
-        const todayDeadlines = user.mockData.assignments.filter(assignment => 
-          assignment.dueDate === today && assignment.status !== 'completed'
-        );
+      await new Promise(r => setTimeout(r, 400));
 
-        // Mock study progress
-        const studyProgress = [
-          { course: 'CS 301', completed: 3, total: 5, percentage: 60 },
-          { course: 'CS 201', completed: 4, total: 6, percentage: 67 },
-          { course: 'MATH 250', completed: 2, total: 4, percentage: 50 },
-          { course: 'ENG 102', completed: 1, total: 3, percentage: 33 }
-        ];
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const twoWeeks = new Date(now.getTime() + 14 * 86400000);
 
-        // Mock AI recommendations
-        const aiRecommendations = [
-          {
-            id: 1,
-            type: 'schedule',
-            title: 'Optimal Study Time',
-            message: 'Based on your patterns, you\'re most productive between 2-4 PM.',
-            priority: 'high'
-          },
-          {
-            id: 2,
-            type: 'workload',
-            title: 'Break Recommendation',
-            message: 'Take a 15-minute break to maintain focus.',
-            priority: 'medium'
-          }
-        ];
-        
-        return {
-          profile: user.mockData.profile,
-          courses: user.mockData.courses,
-          assignments: user.mockData.assignments,
-          upcomingDeadlines,
-          todayDeadlines,
-          personalEvents: user.mockData.personalEvents,
-          notifications: user.mockData.notifications,
-          aiTips: user.mockData.aiTips,
-          aiRecommendations,
-          studyProgress
-        };
-      }
+      const assignments = user.mockData.assignments;
+
+      return {
+        profile: user.mockData.profile,
+        courses: user.mockData.courses,
+        assignments,
+        upcomingDeadlines: assignments.filter(a =>
+          new Date(a.dueDate) >= now &&
+          new Date(a.dueDate) <= twoWeeks &&
+          a.status !== 'completed'
+        ),
+        todayDeadlines: assignments.filter(
+          a => a.dueDate === today && a.status !== 'completed'
+        ),
+        personalEvents: user.mockData.personalEvents,
+        notifications: user.mockData.notifications,
+        aiTips: user.mockData.aiTips,
+        aiRecommendations: user.mockData.aiTips,
+        studyProgress: user.mockData.studyProgress
+      };
     }
+    const userId = getCurrentUserId();
+    if(!userId) throw new Error("Unauthenticated");
+    
+    /* ===== REAL API ===== */
+    const [
+      courses,
+      assignments,
+      loadResponse,
+      aiTipsResponse
+    ] = await Promise.all([
+      api.getCourse(userId),
+      api.getDeadlinesByUserId(userId),
+      api.getStudentLoad(userId),
+      api.getUserTips(userId)
+    ]);
 
-    try {
-      const response = await api.get('/student/dashboard');
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch dashboard data');
-    }
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const twoWeeks = new Date(now.getTime() + 14 * 86400000);
+
+    const upcomingDeadlines = assignments.filter(a =>
+      new Date(a.deadline_date) >= now &&
+      new Date(a.deadline_date) <= twoWeeks
+    );
+
+    const todayDeadlines = assignments.filter(
+      a => a.deadline_date.split('T')[0] === today
+    );
+
+    const studyProgress = courses.map(course => {
+      const courseAssignments = assignments.filter(a => {
+        return a.course_id && (a.course_id._id === course._id || a.course_id === course._id);
+      });
+      const total = courseAssignments.length;
+
+      return {
+        course: course.name,
+        courseId: course._id,
+        completed: 0,
+        total,
+        percentage: total ? Math.round((0 / total) * 100) : 0
+      };
+    });
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    const aiTips = aiTipsResponse.tips || [];
+
+    // Transform backend loadData to frontend format
+    const transformedLoadData = (loadResponse.loadData || []).map(day => {
+      const dayDate = new Date(day.date);
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const isToday = dayDate.toDateString() === now.toDateString();
+      
+      // Map backend risk_level to frontend level
+      let level = 'low';
+      if (day.risk_level === 'danger') level = day.load_score >= 80 ? 'critical' : 'high';
+      else if (day.risk_level === 'warning') level = 'moderate';
+      else level = 'low';
+
+      return {
+        date: day.date,
+        score: day.load_score,
+        level: level,
+        dayName: dayNames[dayDate.getDay()],
+        isToday: isToday,
+        deadlines_count: day.deadlines_count,
+        deadlines: day.deadlines
+      };
+    });
+
+    return {
+      profile: {
+        id: user.id || user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      },
+      courses,
+      assignments,
+      upcomingDeadlines,
+      todayDeadlines,
+      personalEvents: [],
+      notifications: [],
+      aiTips,
+      aiRecommendations: aiTips,
+      studyProgress,
+      loadData: transformedLoadData,
+      peakDays: loadResponse.peakDays || []
+    };
   },
 
+  /* -------------------------
+     CALENDAR
+  ------------------------- */
   async getCalendarData(year, month) {
     if (isDemoUser()) {
       const user = getDemoUser();
-      if (user && user.mockData) {
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return generateCalendarData(year, month, user.mockData.assignments);
-      }
+      await new Promise(r => setTimeout(r, 300));
+      return generateCalendarData(year, month, user.mockData.assignments);
     }
+    
+    const userId = getCurrentUserId();
+    if(!userId) throw new Error("Unauthenticated");
+    
+    const assignments = await api.getDeadlinesByUserId(userId);
 
-    try {
-      const response = await api.get(`/student/calendar/${year}/${month}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch calendar data');
-    }
+    return assignments.filter(a => {
+      const d = new Date(a.deadline_date);
+      return d.getFullYear() === year && d.getMonth() === month - 1;
+    });
   },
 
+  /* -------------------------
+     ASSIGNMENTS
+  ------------------------- */
   async getAssignments() {
     if (isDemoUser()) {
       const user = getDemoUser();
-      if (user && user.mockData) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return user.mockData.assignments;
-      }
+      await new Promise(r => setTimeout(r, 300));
+      return user.mockData.assignments;
     }
-
-    try {
-      const response = await api.get('/student/assignments');
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch assignments');
-    }
+    
+    const userId = getCurrentUserId();
+    if(!userId) throw new Error("Unauthenticated");
+    return api.getAssignments(userId);
   },
 
+  /* -------------------------
+     AI
+  ------------------------- */
+  async generateAITip() {
+    const userId = getCurrentUserId();
+    if(!userId) throw new Error("Unauthenticated");
+    return api.getStudentTip(userId);
+  },
+
+  // async markNotificationRead(tipId) {
+  //   return api.markTipAsRead(tipId);
+  // }
+
   async addPersonalEvent(eventData) {
-    if (isDemoUser()) {
       // Simulate adding to mock data
       await new Promise(resolve => setTimeout(resolve, 300));
       return {
@@ -147,27 +209,23 @@ export const studentService = {
         ...eventData,
         type: 'personal'
       };
-    }
-
-    try {
-      const response = await api.post('/student/events', eventData);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to add personal event');
-    }
+    // try {
+    //   const response = await api.post('/student/events', eventData);
+    //   return response.data;
+    // } catch (error) {
+    //   throw new Error(error.response?.data?.message || 'Failed to add personal event');
+    // }
   },
 
   async markNotificationRead(notificationId) {
-    if (isDemoUser()) {
       await new Promise(resolve => setTimeout(resolve, 200));
       return { success: true };
-    }
-
-    try {
-      const response = await api.patch(`/student/notifications/${notificationId}/read`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to mark notification as read');
-    }
+  
+    // try {
+    //   const response = await api.patch(`/student/notifications/${notificationId}/read`);
+    //   return response.data;
+    // } catch (error) {
+    //   throw new Error(error.response?.data?.message || 'Failed to mark notification as read');
+    // }
   }
 };

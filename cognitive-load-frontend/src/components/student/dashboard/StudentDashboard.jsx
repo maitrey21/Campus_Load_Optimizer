@@ -76,9 +76,6 @@ const StudentDashboard = () => {
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {user?.name || 'Student'}!
         </h1>
-        <p className="text-blue-100">
-          Student Dashboard is working! ✅
-        </p>
         <div className="mt-4 text-sm">
           <p>User: {user?.email}</p>
           <p>Role: {user?.role}</p>
@@ -95,9 +92,11 @@ const StudentDashboard = () => {
           </h2>
           <div className="space-y-2">
             {dashboardData.assignments?.slice(0, 3).map((assignment) => (
-              <div key={assignment.id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
+              <div key={assignment._id} className="p-2 bg-gray-50 dark:bg-gray-700 rounded">
                 <div className="font-medium">{assignment.title}</div>
-                <div className="text-sm text-gray-600">{assignment.courseId}</div>
+                <div className="text-sm text-gray-600">
+                  {assignment.course_id?.name || 'Unknown Course'}
+                </div>
               </div>
             ))}
           </div>
@@ -109,9 +108,9 @@ const StudentDashboard = () => {
           </h2>
           <div className="space-y-2">
             {dashboardData.aiRecommendations?.slice(0, 2).map((tip) => (
-              <div key={tip.id} className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
-                <div className="font-medium text-blue-900 dark:text-blue-200">{tip.title}</div>
-                <div className="text-sm text-blue-700 dark:text-blue-300">{tip.message}</div>
+              <div key={tip._id} className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                <div className="font-medium text-blue-900 dark:text-blue-200">{tip.tip_type}</div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">{tip.tip_text}</div>
               </div>
             ))}
           </div>

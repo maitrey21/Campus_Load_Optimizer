@@ -1,5 +1,22 @@
 // Date utility functions
 
+/**
+ * Parse date string as local date (not UTC)
+ * Prevents timezone issues when backend sends dates like "2026-01-15"
+ */
+const parseLocalDate = (dateString) => {
+  if (!dateString) return null;
+  // If it's already a Date object, return it
+  if (dateString instanceof Date) return dateString;
+  
+  // Extract just the date part (YYYY-MM-DD)
+  const datePart = dateString.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+  
+  // Create date in local timezone
+  return new Date(year, month - 1, day);
+};
+
 export const dateUtils = {
   /**
    * Format date to readable string
@@ -8,9 +25,9 @@ export const dateUtils = {
    * @returns {string} Formatted date string
    */
   formatDate(date, format = 'short') {
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     
-    if (isNaN(d.getTime())) {
+    if (!d || isNaN(d.getTime())) {
       return 'Invalid Date';
     }
 
@@ -70,9 +87,11 @@ export const dateUtils = {
    * @returns {boolean} True if date is today
    */
   isToday(date) {
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     const today = new Date();
-    return d.toDateString() === today.toDateString();
+    d.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return d.getTime() === today.getTime();
   },
 
   /**
@@ -81,10 +100,12 @@ export const dateUtils = {
    * @returns {boolean} True if date is tomorrow
    */
   isTomorrow(date) {
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    return d.toDateString() === tomorrow.toDateString();
+    d.setHours(0, 0, 0, 0);
+    tomorrow.setHours(0, 0, 0, 0);
+    return d.getTime() === tomorrow.getTime();
   },
 
   /**
@@ -107,10 +128,62 @@ export const dateUtils = {
    * @returns {number} Number of days until date (negative if past)
    */
   getDaysUntil(date) {
-    const d = new Date(date);
+    const d = parseLocalDate(date);
     const now = new Date();
+    // Set both to start of day for accurate day counting
+    d.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
     const diffTime = d.getTime() - now.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  },
+
+  /**
+   * Get days until deadline (alias for getDaysUntil)
+   * @param {Date|string} date - Target date
+   * @returns {number} Number of days until date
+   */
+  getDaysUntilDeadline(date) {
+    return this.getDaysUntil(date);
+  },
+
+  /**
+   * Get relative date string (e.g., "Today", "Tomorrow", "In 3 days")
+   * @param {Date|string} date - Date to format
+   * @returns {string} Relative date string
+   */
+  getRelativeDate(date) {
+    const d = parseLocalDate(date);
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    
+    const diffTime = d.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays > 1 && diffDays <= 7) return `In ${diffDays} days`;
+    if (diffDays < -1 && diffDays >= -7) return `${Math.abs(diffDays)} days ago`;
+    
+    // For dates further away, show actual date
+    return this.formatDate(date, 'short');
+  },
+
+  /**
+   * Get urgency level based on days until deadline
+   * @param {Date|string} date - Deadline date
+   * @returns {string} Urgency level
+   */
+  getUrgencyLevel(date) {
+    const daysUntil = this.getDaysUntil(date);
+    
+    if (daysUntil < 0) return 'overdue';
+    if (daysUntil === 0) return 'today';
+    if (daysUntil === 1) return 'tomorrow';
+    if (daysUntil <= 3) return 'urgent';
+    if (daysUntil <= 7) return 'soon';
+    return 'normal';
   },
 
   /**

@@ -70,7 +70,18 @@ const AITipsPanel = ({ recommendations, loadData, deadlines }) => {
     }];
   };
 
-  const allTips = [...(recommendations || []), ...generateSmartTips()];
+  // Convert backend AI tips to display format
+  const backendTips = (recommendations || []).map(tip => ({
+    type: tip.tip_type === 'conflict_warning' ? 'warning' : 
+          tip.metadata?.priority === 'high' ? 'warning' : 'info',
+    title: tip.tip_type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'AI Tip',
+    message: tip.tip_text,
+    icon: tip.tip_type === 'conflict_warning' ? '⚠️' : 
+          tip.tip_type === 'study_tips' ? '📚' : 
+          tip.tip_type === 'professor_suggestion' ? '👨‍🏫' : '🤖'
+  }));
+
+  const allTips = [...backendTips, ...generateSmartTips()];
   const displayTips = isExpanded ? allTips : allTips.slice(0, 2);
 
   const getTypeColor = (type) => {

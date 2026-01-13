@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { authService } from '../services/authService';
+import api from '../apis/api'
 import { mockData } from '../services/mockData';
 
 const AuthContext = createContext();
@@ -23,28 +23,24 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const { token } = api.getTokens();
       if (token) {
-        // Check if it's a demo token
-        if (token.startsWith('demo_token_')) {
-          const demoUser = localStorage.getItem('demo_user');
-          if (demoUser) {
-            const userData = JSON.parse(demoUser);
-            setUser(userData);
-            setIsAuthenticated(true);
-            return;
-          }
+        // Verify with backend via API (encapsulates refresh logic)
+        const response = await api.getCurrentUser();
+        if (response.user) {
+          setUser(response.user);
+          setIsAuthenticated(true);
+        } else {
+          throw new Error('Invalid user data');
         }
-        
-        // Regular token verification
-        const userData = await authService.verifyToken(token);
-        setUser(userData);
-        setIsAuthenticated(true);
+      } else {
+        setLoading(false);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('demo_user');
+      api.clearAuth();
+      setUser(null);
+      setIsAuthenticated(false);
     } finally {
       setLoading(false);
     }
@@ -52,81 +48,41 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // Demo accounts for testing
-      const demoAccounts = {
-        'student@demo.com': {
-          id: 1,
-          name: 'Demo Student',
-          email: 'student@demo.com',
-          role: 'student',
-          avatar: '/images/profile-1.jpg'
-        },
-        'professor@demo.com': {
-          id: 2,
-          name: 'Dr. Demo Professor',
-          email: 'professor@demo.com',
-          role: 'professor',
-          avatar: '/images/profile-2.jpeg'
-        },
-        'admin@demo.com': {
-          id: 3,
-          name: 'Demo Admin',
-          email: 'admin@demo.com',
-          role: 'admin',
-          avatar: '/images/profile-3.jpg'
-        }
-      };
-
-      // Check if it's a demo account
-      if (demoAccounts[email] && password === 'demo123') {
-        const userData = demoAccounts[email];
-        const demoToken = `demo_token_${userData.role}_${Date.now()}`;
-        
-        // Add mock data to user object
-        userData.mockData = mockData[userData.role];
-        
-        localStorage.setItem('token', demoToken);
-        localStorage.setItem('demo_user', JSON.stringify(userData));
-        setUser(userData);
-        setIsAuthenticated(true);
-        
-        return userData;
-      }
-
-      // Regular API login for non-demo accounts
-      const response = await authService.login(email, password);
-      const { user: userData, token } = response;
-      
-      localStorage.setItem('token', token);
+      const response = await api.login(email, password);
+      const { user: userData } = response;
       setUser(userData);
       setIsAuthenticated(true);
-      
       return userData;
     } catch (error) {
       throw error;
     }
   };
 
-  const signup = async (userData) => {
+  const signup = async (email, password, name, role) => {
     try {
-      const response = await authService.signup(userData);
-      const { user: newUser, token } = response;
-      
-      localStorage.setItem('token', token);
-      setUser(newUser);
-      setIsAuthenticated(true);
-      
-      return newUser;
+      const response = await api.signup(email, password, name, role);
+      // Backend might return token immediately or require email confirmation
+      if (response.token && response.user) {
+        setUser(response.user);
+        setIsAuthenticated(true);
+        return response.user;
+      }
+      return response; // Pass through mostly for email confirmation message
     } catch (error) {
       throw error;
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('demo_user');
-    setUser(null);
-    setIsAuthenticated(false);
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      console.error('Logout error', err);
+    } finally {
+      setUser(null);
+      setIsAuthenticated(false);
+      api.clearAuth();
+    }
   };
 
   const value = {

@@ -32,12 +32,12 @@ const UpcomingDeadlines = ({ deadlines, loadData }) => {
       <div className="space-y-3 max-h-80 overflow-y-auto">
         {deadlines && deadlines.length > 0 ? (
           deadlines.slice(0, 10).map((deadline, index) => {
-            const urgency = dateUtils.getUrgencyLevel(deadline.dueDate);
-            const daysUntil = dateUtils.getDaysUntilDeadline(deadline.dueDate);
+            const urgency = dateUtils.getUrgencyLevel(deadline.deadline_date);
+            const daysUntil = dateUtils.getDaysUntilDeadline(deadline.deadline_date);
             
             return (
               <motion.div
-                key={deadline.id || index}
+                key={deadline._id || index}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -51,11 +51,11 @@ const UpcomingDeadlines = ({ deadlines, loadData }) => {
                     <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="flex items-center space-x-1">
                         <BookOpen className="w-3 h-3" />
-                        <span>{deadline.courseId}</span>
+                        <span>{deadline.course_id?.name || 'Unknown Course'}</span>
                       </span>
                       <span className="flex items-center space-x-1">
                         <Clock className="w-3 h-3" />
-                        <span>{dateUtils.getRelativeDate(deadline.dueDate)}</span>
+                        <span>{dateUtils.getRelativeDate(deadline.deadline_date)}</span>
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-2">

@@ -39,6 +39,15 @@ const AITipsView = () => {
     setRefreshing(false);
   };
 
+  // Helper to parse dates correctly
+  const parseLocalDate = (dateString) => {
+    if (!dateString) return null;
+    if (dateString instanceof Date) return dateString;
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+    return new Date(year, month - 1, day);
+  };
+
   const generateAITips = (data) => {
     const tips = [];
     const assignments = data.assignments || [];
@@ -92,8 +101,13 @@ const AITipsView = () => {
 
     // Deadline Proximity Warnings
     const urgentAssignments = assignments.filter(a => {
-      const daysUntil = Math.ceil((new Date(a.dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-      return daysUntil <= 3 && daysUntil >= 0 && a.status !== 'completed';
+      const dueDate = parseLocalDate(a.deadline_date);
+      if (!dueDate) return false;
+      dueDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+      return daysUntil <= 3 && daysUntil >= 0;
     });
 
     if (urgentAssignments.length > 0) {
@@ -116,8 +130,15 @@ const AITipsView = () => {
       });
     }
 
-    // Study Pattern Analysis
-    const completedAssignments = assignments.filter(a => a.status === 'completed');
+    // Study Pattern Analysis (backend doesn't track status, so we check past deadlines)
+    const completedAssignments = assignments.filter(a => {
+      const deadlineDate = parseLocalDate(a.deadline_date);
+      if (!deadlineDate) return false;
+      deadlineDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return deadlineDate < today;
+    });
     if (completedAssignments.length >= 3) {
       tips.push({
         id: 'study-pattern',
@@ -158,7 +179,14 @@ const AITipsView = () => {
     }
 
     // Study Technique Recommendations
-    const highDifficultyAssignments = assignments.filter(a => a.difficulty >= 7 && a.status !== 'completed');
+    const highDifficultyAssignments = assignments.filter(a => {
+      const deadlineDate = parseLocalDate(a.deadline_date);
+      if (!deadlineDate) return false;
+      deadlineDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return a.difficulty >= 4 && deadlineDate >= today; // difficulty is 1-5 scale
+    });
     if (highDifficultyAssignments.length > 0) {
       tips.push({
         id: 'study-techniques',
@@ -357,8 +385,8 @@ const AITipsView = () => {
                         </h4>
                         <div className="space-y-1">
                           {tip.assignments.map(assignment => (
-                            <div key={assignment.id} className="text-sm text-gray-600 dark:text-gray-400">
-                              • {assignment.title} ({assignment.courseId}) - Due {new Date(assignment.dueDate).toLocaleDateString()}
+                            <div key={assignment._id} className="text-sm text-gray-600 dark:text-gray-400">
+                              • {assignment.title} ({assignment.course_id?.name || 'Unknown Course'}) - Due {new Date(assignment.deadline_date).toLocaleDateString()}
                             </div>
                           ))}
                         </div>

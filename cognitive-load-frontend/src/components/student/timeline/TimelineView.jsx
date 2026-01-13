@@ -54,18 +54,18 @@ const TimelineView = () => {
     // Add assignments
     assignments.forEach(assignment => {
       items.push({
-        id: `assignment-${assignment.id}`,
+        id: `assignment-${assignment._id}`,
         type: 'assignment',
         title: assignment.title,
-        subtitle: assignment.courseId,
-        date: assignment.dueDate,
-        status: assignment.status,
+        subtitle: assignment.course_id?.name || 'Unknown Course',
+        date: assignment.deadline_date,
+        status: assignment.status || 'pending',
         difficulty: assignment.difficulty,
         importance: assignment.importance,
         estimatedHours: assignment.estimatedHours,
         description: assignment.description,
         icon: BookOpen,
-        color: getAssignmentColor(assignment.status)
+        color: getAssignmentColor(assignment.status || 'pending')
       });
     });
 

@@ -1,5 +1,18 @@
 // Cognitive Load Calculator Utilities
 
+/**
+ * Parse date string as local date (not UTC)
+ * Prevents timezone issues when backend sends dates
+ */
+const parseLocalDate = (dateString) => {
+  if (!dateString) return null;
+  if (dateString instanceof Date) return dateString;
+  
+  const datePart = dateString.split('T')[0];
+  const [year, month, day] = datePart.split('-').map(num => parseInt(num, 10));
+  return new Date(year, month - 1, day);
+};
+
 export const loadCalculator = {
   /**
    * Calculate cognitive load score for a specific date
@@ -9,32 +22,37 @@ export const loadCalculator = {
    * @returns {Object} Load data with score and level
    */
   calculateDayLoad(assignments = [], personalEvents = [], targetDate) {
-    const target = new Date(targetDate);
+    const target = parseLocalDate(targetDate);
+    target.setHours(0, 0, 0, 0);
     let totalLoad = 0;
 
     // Calculate assignment load
     assignments.forEach(assignment => {
-      if (assignment.status === 'completed') return;
-      
-      const dueDate = new Date(assignment.dueDate);
+      const dueDate = parseLocalDate(assignment.deadline_date);
+      dueDate.setHours(0, 0, 0, 0);
       const daysUntilDue = Math.ceil((dueDate - target) / (1000 * 60 * 60 * 24));
       
       if (daysUntilDue >= 0 && daysUntilDue <= 14) {
         // Load increases as deadline approaches
         const urgencyFactor = Math.max(0.1, (14 - daysUntilDue) / 14);
-        const difficultyWeight = (assignment.difficulty || 5) / 10;
-        const importanceWeight = (assignment.importance || 5) / 10;
-        const hoursWeight = Math.min(1, (assignment.estimatedHours || 3) / 10);
+        const difficultyWeight = (assignment.difficulty || 3) / 5; // difficulty is 1-5 scale
         
-        const assignmentLoad = urgencyFactor * difficultyWeight * importanceWeight * hoursWeight * 100;
+        // Type weights: exams > projects > assignments
+        let typeWeight = 0.5;
+        if (assignment.type === 'exam') typeWeight = 1.0;
+        else if (assignment.type === 'project') typeWeight = 0.8;
+        else if (assignment.type === 'assignment') typeWeight = 0.5;
+        
+        const assignmentLoad = urgencyFactor * difficultyWeight * typeWeight * 100;
         totalLoad += assignmentLoad;
       }
     });
 
     // Add personal events load (lighter impact)
     personalEvents.forEach(event => {
-      const eventDate = new Date(event.date);
-      if (eventDate.toDateString() === target.toDateString()) {
+      const eventDate = parseLocalDate(event.date);
+      eventDate.setHours(0, 0, 0, 0);
+      if (eventDate.getTime() === target.getTime()) {
         totalLoad += (event.duration || 1) * 5; // 5 points per hour
       }
     });

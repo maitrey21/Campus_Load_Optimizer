@@ -1,133 +1,181 @@
-import axios from 'axios';
+import api from '../apis/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+const getCurrentUserId = () => {
+  const user = localStorage.getItem('user');
+  if (!user) return null;
+  const parsed = JSON.parse(user);
+  return parsed.id || parsed._id;
+};
 
 export const professorService = {
-  async getDashboardData(professorId) {
+  async getDashboardData() {
     try {
-      const response = await api.get(`/professor/${professorId}/dashboard`);
-      return response.data;
+      const userId = getCurrentUserId();
+      if (!userId) throw new Error('Unauthenticated');
+
+      const [courses, aiTips] = await Promise.all([
+        api.getCourse(userId),
+        api.getUserTips(userId)
+      ]);
+
+      // Get deadlines for all professor's courses
+      const allDeadlines = await api.getDeadlinesByUserId(userId);
+
+      const user = JSON.parse(localStorage.getItem('user'));
+
+      return {
+        profile: {
+          id: user.id || user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        courses,
+        deadlines: allDeadlines,
+        aiTips: aiTips.tips || []
+      };
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch dashboard data');
+      throw new Error(error.message || 'Failed to fetch dashboard data');
     }
   },
 
-  async getCourses(professorId) {
+  async getCourses() {
     try {
-      const response = await api.get(`/professor/${professorId}/courses`);
-      return response.data;
+      const userId = getCurrentUserId();
+      if (!userId) throw new Error('Unauthenticated');
+      return await api.getCourse(userId);
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch courses');
+      throw new Error(error.message || 'Failed to fetch courses');
     }
   },
 
-  async getDeadlines(professorId, courseId) {
+  async getDeadlines(courseId) {
     try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/deadlines`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch deadlines');
-    }
-  },
+      const userId = getCurrentUserId();
+      if (!userId) throw new Error('Unauthenticated');
+      const allDeadlines = await api.getDeadlinesByUserId(userId);
 
-  async createDeadline(professorId, courseId, deadlineData) {
-    try {
-      const response = await api.post(`/professor/${professorId}/courses/${courseId}/deadlines`, deadlineData);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to create deadline');
-    }
-  },
-
-  async updateDeadline(professorId, courseId, deadlineId, deadlineData) {
-    try {
-      const response = await api.put(`/professor/${professorId}/courses/${courseId}/deadlines/${deadlineId}`, deadlineData);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to update deadline');
-    }
-  },
-
-  async deleteDeadline(professorId, courseId, deadlineId) {
-    try {
-      const response = await api.delete(`/professor/${professorId}/courses/${courseId}/deadlines/${deadlineId}`);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to delete deadline');
-    }
-  },
-
-  async getClassLoadOverview(professorId, courseId, startDate, endDate) {
-    try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/load-overview`, {
-        params: { startDate, endDate }
+      // Filter deadlines for specific course
+      return allDeadlines.filter(d => {
+        return d.course_id && (d.course_id._id === courseId || d.course_id === courseId);
       });
-      return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch class load overview');
+      throw new Error(error.message || 'Failed to fetch deadlines');
     }
   },
 
-  async getStudentsAtRisk(professorId, courseId) {
+  async createDeadline(courseId, deadlineData) {
     try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/students-at-risk`);
-      return response.data;
+      const response = await api.createDeadline(
+        deadlineData.title,
+        courseId,
+        deadlineData.deadline_date,
+        deadlineData.difficulty,
+        deadlineData.type
+      );
+      return response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch students at risk');
+      throw new Error(error.message || 'Failed to create deadline');
     }
   },
 
-  async getConflictDetection(professorId, courseId) {
+  async updateDeadline(deadlineId, deadlineData) {
     try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/conflicts`);
-      return response.data;
+      const response = await api.updateDeadline(deadlineId, deadlineData);
+      return response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch conflict detection');
+      throw new Error(error.message || 'Failed to update deadline');
     }
   },
 
-  async getAIRecommendations(professorId, courseId) {
+  async deleteDeadline(deadlineId) {
     try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/ai-recommendations`);
-      return response.data;
+      const response = await api.deleteDeadline(deadlineId);
+      return response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch AI recommendations');
+      throw new Error(error.message || 'Failed to delete deadline');
     }
   },
 
-  async applyAISuggestion(professorId, courseId, suggestionId, action) {
+  async getClassLoadOverview(courseId) {
     try {
-      const response = await api.post(`/professor/${professorId}/courses/${courseId}/ai-suggestions/${suggestionId}/apply`, {
-        action
-      });
-      return response.data;
+      // Get AI suggestion which contains classLoadData
+      const response = await api.getProfessorSuggestion(courseId);
+      return {
+        classLoadData: response.classLoadData || [],
+        conflicts: response.conflicts || []
+      };
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to apply AI suggestion');
+      console.error('Failed to fetch class load overview:', error);
+      return { classLoadData: [], conflicts: [] };
     }
   },
 
-  async getAlternativeDates(professorId, courseId, deadlineId) {
+  async getStudentsAtRisk(courseId) {
     try {
-      const response = await api.get(`/professor/${professorId}/courses/${courseId}/deadlines/${deadlineId}/alternatives`);
-      return response.data;
+      // This would need a specific backend endpoint
+      // For now, returning empty array
+      return [];
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch alternative dates');
+      throw new Error(error.message || 'Failed to fetch students at risk');
+    }
+  },
+
+  async getConflictDetection(courseId) {
+    try {
+      const response = await api.getCourseConflicts(courseId);
+      return response.conflicts || [];
+    } catch (error) {
+      console.error('Failed to fetch conflicts:', error);
+      return [];
+    }
+  },
+
+  async getAIRecommendations(courseId) {
+    try {
+      // Returns the full response containing suggestion, classLoadData, and conflicts
+      const response = await api.getProfessorSuggestion(courseId);
+      return {
+        suggestion: response.suggestion || null,
+        classLoadData: response.classLoadData || [],
+        conflicts: response.conflicts || [],
+        success: response.success || false
+      };
+    } catch (error) {
+      console.error('Failed to fetch AI recommendations:', error);
+      return {
+        suggestion: null,
+        classLoadData: [],
+        conflicts: [],
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  async applyAISuggestion(courseId, suggestionId, action) {
+    try {
+      // Backend doesn't have this endpoint yet
+      // This would need to be implemented
+      return { success: true };
+    } catch (error) {
+      throw new Error(error.message || 'Failed to apply AI suggestion');
+    }
+  },
+
+  async getAlternativeDates(courseId, deadlineId) {
+    try {
+      // This information comes from conflict detection
+      const conflictsResponse = await api.getCourseConflicts(courseId);
+      const conflicts = conflictsResponse.conflicts || [];
+
+      const relevantConflict = conflicts.find(c =>
+        c.deadlines && c.deadlines.some(d => d._id === deadlineId)
+      );
+
+      return relevantConflict?.suggested_dates || [];
+    } catch (error) {
+      throw new Error(error.message || 'Failed to fetch alternative dates');
     }
   }
 };

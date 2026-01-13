@@ -35,9 +35,6 @@ const DashboardHeader = ({ user, todayLoad, onRefresh }) => {
             <h1 className="text-3xl font-bold">
               Welcome back, {user?.name?.split(' ')[0] || 'Student'}!
             </h1>
-            <p className="text-blue-100 text-lg">
-              {user?.studentId && `ID: ${user.studentId}`}
-            </p>
           </div>
         </div>
 

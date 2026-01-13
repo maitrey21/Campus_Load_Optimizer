@@ -11,9 +11,7 @@ const Signup = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'student',
-    studentId: '',
-    department: ''
+    role: 'student'
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -33,15 +31,11 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      const user = await signup(formData);
-      toast.success(`Welcome to CLMS, ${user.name}!`);
+      const user = await signup(formData.email, formData.password, formData.name, formData.role);
+      toast.success('Account created successfully! Please check your email to verify your account.');
       
-      // Redirect based on user role
-      const redirectPath = user.role === 'student' ? '/student' : 
-                          user.role === 'professor' ? '/professor' : 
-                          user.role === 'admin' ? '/admin' : '/';
-      
-      navigate(redirectPath, { replace: true });
+      // Redirect to login page after successful signup
+      navigate('/login', { replace: true });
     } catch (error) {
       toast.error(error.message || 'Signup failed');
     } finally {
@@ -149,25 +143,6 @@ const Signup = () => {
                 </select>
               </div>
             </div>
-
-            {/* Student ID (conditional) */}
-            {formData.role === 'student' && (
-              <div>
-                <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Student ID
-                </label>
-                <input
-                  id="studentId"
-                  name="studentId"
-                  type="text"
-                  value={formData.studentId}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                  placeholder="Enter your student ID"
-                />
-              </div>
-            )}
-
             {/* Password Field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

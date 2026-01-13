@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Users, Plus, Edit, Trash2, Search, Filter, Eye, Shield, Mail, Phone, Calendar } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { adminService } from '../../../services/adminService';
+import { Loader2 } from 'lucide-react';
 
 const UserManagement = () => {
+  const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -17,95 +16,37 @@ const UserManagement = () => {
     loadUsers();
   }, []);
 
-  const loadUsers = () => {
-    // Mock user data
-    const mockUsers = [
-      {
-        id: 1,
-        name: 'John Doe',
-        email: 'john.doe@university.edu',
-        role: 'student',
-        status: 'active',
-        department: 'Computer Science',
-        year: 'Junior',
-        joinDate: '2024-09-01',
-        lastLogin: '2026-01-12T10:30:00Z',
-        cognitiveLoad: 72
-      },
-      {
-        id: 2,
-        name: 'Dr. Sarah Smith',
-        email: 'sarah.smith@university.edu',
-        role: 'professor',
-        status: 'active',
-        department: 'Computer Science',
-        courses: ['CS201', 'CS301'],
-        joinDate: '2020-08-15',
-        lastLogin: '2026-01-12T14:15:00Z'
-      },
-      {
-        id: 3,
-        name: 'Jane Wilson',
-        email: 'jane.wilson@university.edu',
-        role: 'student',
-        status: 'inactive',
-        department: 'Mathematics',
-        year: 'Senior',
-        joinDate: '2023-09-01',
-        lastLogin: '2026-01-10T09:20:00Z',
-        cognitiveLoad: 45
-      },
-      {
-        id: 4,
-        name: 'Prof. Michael Brown',
-        email: 'michael.brown@university.edu',
-        role: 'professor',
-        status: 'active',
-        department: 'Physics',
-        courses: ['PHYS101', 'PHYS301'],
-        joinDate: '2018-01-10',
-        lastLogin: '2026-01-12T11:45:00Z'
-      },
-      {
-        id: 5,
-        name: 'Admin User',
-        email: 'admin@university.edu',
-        role: 'admin',
-        status: 'active',
-        department: 'IT Administration',
-        joinDate: '2019-03-01',
-        lastLogin: '2026-01-12T15:00:00Z'
-      }
-    ];
-    setUsers(mockUsers);
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await adminService.getAllUsers();
+      // Map API data to UI format if needed, or just use as is
+      setUsers(data || []);
+    } catch (error) {
+      toast.error('Failed to load users');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCreateUser = (formData) => {
-    const newUser = {
-      id: Date.now(),
-      ...formData,
-      joinDate: new Date().toISOString().split('T')[0],
-      lastLogin: new Date().toISOString(),
-      status: 'active'
-    };
-    setUsers([...users, newUser]);
+  const handleCreateUser = async (formData) => {
+    // Note: Creating user requires auth/signup flow which might not be fully exposed for admin
+    // For now, we'll suggest using signup page or implement later
+    toast.error('User creation from admin panel is not yet implemented. Please use Signup page.');
     setShowCreateModal(false);
-    toast.success('User created successfully!');
   };
 
   const handleEditUser = (formData) => {
-    setUsers(users.map(u => 
-      u.id === editingUser.id ? { ...u, ...formData } : u
-    ));
+    // Implement API call for update
+    toast.error('Edit user not implemented yet');
     setShowEditModal(false);
-    setEditingUser(null);
-    toast.success('User updated successfully!');
   };
 
   const handleDeleteUser = (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(u => u.id !== id));
-      toast.success('User deleted successfully!');
+      // Implement API call for delete
+      toast.error('Delete user not implemented yet');
     }
   };
 
@@ -117,13 +58,13 @@ const UserManagement = () => {
 
     switch (action) {
       case 'activate':
-        setUsers(users.map(u => 
+        setUsers(users.map(u =>
           selectedUsers.includes(u.id) ? { ...u, status: 'active' } : u
         ));
         toast.success(`Activated ${selectedUsers.length} users`);
         break;
       case 'deactivate':
-        setUsers(users.map(u => 
+        setUsers(users.map(u =>
           selectedUsers.includes(u.id) ? { ...u, status: 'inactive' } : u
         ));
         toast.success(`Deactivated ${selectedUsers.length} users`);
@@ -140,10 +81,9 @@ const UserManagement = () => {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
+    return matchesSearch && matchesRole;
   });
 
   const getRoleColor = (role) => {
@@ -156,8 +96,8 @@ const UserManagement = () => {
   };
 
   const getStatusColor = (status) => {
-    return status === 'active' 
-      ? 'bg-green-100 text-green-800' 
+    return status === 'active'
+      ? 'bg-green-100 text-green-800'
       : 'bg-red-100 text-red-800';
   };
 
@@ -210,7 +150,7 @@ const UserManagement = () => {
             <Users className="w-12 h-12 opacity-80" />
           </div>
         </div>
-        
+
         <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -220,7 +160,7 @@ const UserManagement = () => {
             <span className="text-4xl">🎓</span>
           </div>
         </div>
-        
+
         <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
@@ -230,16 +170,8 @@ const UserManagement = () => {
             <span className="text-4xl">👨‍🏫</span>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Active Users</h3>
-              <p className="text-3xl font-bold">{users.filter(u => u.status === 'active').length}</p>
-            </div>
-            <span className="text-4xl">✅</span>
-          </div>
-        </div>
+
+
       </motion.div>
 
       {/* Search and Filters */}
@@ -274,15 +206,7 @@ const UserManagement = () => {
                 <option value="admin">Admins</option>
               </select>
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+
           </div>
         </div>
 
@@ -330,7 +254,7 @@ const UserManagement = () => {
             Users ({filteredUsers.length})
           </h2>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -353,15 +277,6 @@ const UserManagement = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Department
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                  Last Login
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                   Actions
@@ -395,11 +310,6 @@ const UserManagement = () => {
                         <div className="text-sm text-gray-500 dark:text-gray-400">
                           {user.email}
                         </div>
-                        {user.cognitiveLoad && (
-                          <div className="text-xs text-blue-600">
-                            Load: {user.cognitiveLoad}%
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>
@@ -407,19 +317,6 @@ const UserManagement = () => {
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getRoleColor(user.role)}`}>
                       {user.role}
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(user.status)}`}>
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {user.department}
-                    {user.year && <div className="text-xs text-gray-500">{user.year}</div>}
-                    {user.courses && <div className="text-xs text-gray-500">{user.courses.join(', ')}</div>}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {new Date(user.lastLogin).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
@@ -431,9 +328,6 @@ const UserManagement = () => {
                         className="text-blue-600 hover:text-blue-900 p-1 rounded"
                       >
                         <Edit className="w-4 h-4" />
-                      </button>
-                      <button className="text-green-600 hover:text-green-900 p-1 rounded">
-                        <Eye className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteUser(user.id)}
@@ -510,7 +404,7 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
           {title}
         </h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -519,12 +413,12 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Email
@@ -532,19 +426,19 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
             <input
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               required
             />
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Role
             </label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="student">Student</option>
@@ -552,7 +446,7 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
               <option value="admin">Admin</option>
             </select>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Department
@@ -560,11 +454,11 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
             <input
               type="text"
               value={formData.department}
-              onChange={(e) => setFormData({...formData, department: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
-          
+
           {formData.role === 'student' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -572,7 +466,7 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
               </label>
               <select
                 value={formData.year}
-                onChange={(e) => setFormData({...formData, year: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
                 <option value="">Select Year</option>
@@ -583,7 +477,7 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
               </select>
             </div>
           )}
-          
+
           {formData.role === 'professor' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -592,13 +486,13 @@ const UserModal = ({ title, user, onSubmit, onClose }) => {
               <input
                 type="text"
                 value={formData.courses}
-                onChange={(e) => setFormData({...formData, courses: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, courses: e.target.value })}
                 placeholder="CS201, CS301"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
             </div>
           )}
-          
+
           <div className="flex space-x-3 pt-4">
             <button
               type="submit"
